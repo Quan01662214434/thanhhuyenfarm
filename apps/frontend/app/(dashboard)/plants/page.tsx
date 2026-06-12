@@ -22,6 +22,7 @@ import {
   X,
   Upload,
 } from "lucide-react";
+import Barcode from "react-barcode";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -39,6 +40,7 @@ type PlantRow = {
   health: string;
   qrToken: string;
   statusNote: string | null;
+  barcode: string | null;
   plantedAt: string;
   zone: { name: string };
   media: { url: string | null }[];
@@ -129,7 +131,7 @@ function PlantsPageContent() {
   });
 
   const updatePlant = useMutation({
-    mutationFn: async ({ id, ...dto }: { id: string; species?: string; health?: string; statusNote?: string; plantIndex?: number | null }) => {
+    mutationFn: async ({ id, ...dto }: { id: string; species?: string; health?: string; statusNote?: string; plantIndex?: number | null; barcode?: string | null }) => {
       await api.patch(`/plants/${id}`, dto);
     },
     onSuccess: () => {
@@ -371,12 +373,13 @@ function PlantsPageContent() {
 function EditPlantModal({ plant, onClose, onSave, isPending }: {
   plant: PlantRow;
   onClose: () => void;
-  onSave: (dto: { species?: string; health?: string; statusNote?: string; plantIndex?: number | null }) => void;
+  onSave: (dto: { species?: string; health?: string; statusNote?: string; plantIndex?: number | null; barcode?: string | null }) => void;
   isPending: boolean;
 }) {
   const [species, setSpecies] = useState(plant.species);
   const [health, setHealth] = useState(plant.health);
   const [statusNote, setStatusNote] = useState(plant.statusNote || "");
+  const [barcode, setBarcode] = useState(plant.barcode || "");
   const [plantIndex, setPlantIndex] = useState(plant.plantIndex?.toString() || "");
 
   return (
@@ -408,6 +411,12 @@ function EditPlantModal({ plant, onClose, onSave, isPending }: {
           </div>
 
           <div>
+            <label className="text-xs font-medium text-neutral-500 mb-1 block">Mã vạch sản phẩm EAN-13 (Tùy chọn)</label>
+            <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} className="rounded-xl" placeholder="VD: 8931234567890" />
+            <p className="text-[10px] text-neutral-400 mt-1">Dùng để quét máy POS ở siêu thị Winmart, Bách Hóa Xanh...</p>
+          </div>
+
+          <div>
             <label className="text-xs font-medium text-neutral-500 mb-2 block">Tình trạng sức khỏe</label>
             <div className="flex gap-2 flex-wrap">
               {healthOptions.map((h) => {
@@ -433,7 +442,7 @@ function EditPlantModal({ plant, onClose, onSave, isPending }: {
         </div>
 
         <div className="flex gap-2 mt-6">
-          <Button className="rounded-xl flex-1 gap-1" disabled={isPending} onClick={() => onSave({ species, health, statusNote: statusNote || undefined, plantIndex: plantIndex ? Number(plantIndex) : null })}>
+          <Button className="rounded-xl flex-1 gap-1" disabled={isPending} onClick={() => onSave({ species, health, statusNote: statusNote || undefined, plantIndex: plantIndex ? Number(plantIndex) : null, barcode: barcode || null })}>
             <Check className="h-3 w-3" /> Lưu thay đổi
           </Button>
           <Button variant="outline" className="rounded-xl" onClick={onClose}>Hủy</Button>
@@ -488,6 +497,13 @@ function QrModal({ plant, onClose }: { plant: PlantRow; onClose: () => void }) {
             <p className="text-xs text-neutral-500">{plant.zone.name}</p>
             <p className="text-[10px] font-mono text-neutral-400 mt-1 break-all">ID: {plant.id}</p>
           </div>
+
+          {plant.barcode && (
+            <div className="flex flex-col items-center justify-center bg-white rounded-xl p-3 mt-2 shadow-sm border border-neutral-100">
+              <Barcode value={plant.barcode} format="EAN13" width={2} height={50} fontSize={14} />
+              <p className="text-[10px] text-neutral-500 mt-1">Mã siêu thị (POS)</p>
+            </div>
+          )}
 
           <div className="flex gap-2">
             <Button className="rounded-xl flex-1 gap-1" onClick={downloadQR}>

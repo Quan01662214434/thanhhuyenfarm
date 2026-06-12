@@ -43,6 +43,11 @@ export class CreatePlantDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsDateString()
   estimatedHarvestAt?: string;
 

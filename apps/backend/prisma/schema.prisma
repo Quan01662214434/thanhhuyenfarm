@@ -183,6 +183,7 @@ model Plant {
   health               PlantHealth  @default(HEALTHY)
   statusNote           String?
   qrToken              String       @unique
+  barcode              String?
   estimatedHarvestAt   DateTime?
   aiYieldPrediction    Json?
   currentYieldEstimate Float?

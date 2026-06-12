@@ -51,6 +51,7 @@ export class PlantsService {
         health: dto.health,
         statusNote: dto.statusNote,
         plantIndex: dto.plantIndex,
+        barcode: dto.barcode,
         qrToken,
         estimatedHarvestAt: dto.estimatedHarvestAt ? new Date(dto.estimatedHarvestAt) : undefined,
         currentYieldEstimate: dto.currentYieldEstimate,
@@ -169,6 +170,7 @@ export class PlantsService {
         health: dto.health,
         statusNote: dto.statusNote,
         plantIndex: dto.plantIndex,
+        barcode: dto.barcode,
         estimatedHarvestAt: dto.estimatedHarvestAt
           ? new Date(dto.estimatedHarvestAt)
           : undefined,

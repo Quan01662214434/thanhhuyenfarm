@@ -2,6 +2,11 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { UserRole } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import * as QRCode from 'qrcode';
+import { stringify } from 'csv-stringify/sync';
+import { parse } from 'csv-parse/sync';
+import { UserRole } from '@prisma/client';
+import { nanoid } from 'nanoid';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { RequestUser } from '../common/decorators/current-user.decorator';
 import { CreatePlantDto } from './dto/create-plant.dto';
@@ -235,5 +240,90 @@ export class PlantsService {
         appliedById: user.userId,
       },
     });
+  }
+
+  // ─── Import / Export methods ───
+
+  async exportCsv(user: RequestUser) {
+    const plants = await this.prisma.plant.findMany({
+      where: {
+        deletedAt: null,
+        zone: { farm: { organizationId: user.organizationId } },
+      },
+      include: { zone: true },
+      orderBy: [{ zone: { name: 'asc' } }, { plantIndex: 'asc' }],
+    });
+
+    const data = plants.map(p => ({
+      'Khu vực': p.zone.name,
+      'Số thứ tự': p.plantIndex ?? '',
+      'Giống cây': p.species,
+      'Ngày trồng': p.plantedAt.toISOString().split('T')[0],
+      'Tình trạng': p.health,
+      'Ghi chú': p.statusNote ?? '',
+    }));
+
+    return stringify(data, { header: true, bom: true });
+  }
+
+  async importCsv(user: RequestUser, fileBuffer: Buffer) {
+    const records = parse(fileBuffer, { columns: true, skip_empty_lines: true });
+    
+    // First, find the first farm for the user to put zones in if they don't exist
+    const farm = await this.prisma.farm.findFirst({
+      where: { organizationId: user.organizationId, deletedAt: null },
+    });
+    if (!farm) throw new NotFoundException('Vui lòng tạo trang trại trong Cài đặt trước khi import.');
+
+    const zonesCache = new Map<string, string>();
+    let imported = 0;
+
+    for (const row of records) {
+      const zoneName = row['Khu vực']?.trim() || 'Khu vực chung';
+      const indexStr = row['Số thứ tự']?.trim();
+      const species = row['Giống cây']?.trim() || 'Sầu riêng';
+      const dateStr = row['Ngày trồng']?.trim();
+      const plantIndex = indexStr ? parseInt(indexStr, 10) : undefined;
+      const plantedAt = dateStr ? new Date(dateStr) : new Date();
+
+      // Find or create zone
+      let zoneId = zonesCache.get(zoneName);
+      if (!zoneId) {
+        let zone = await this.prisma.zone.findFirst({
+          where: { name: zoneName, farmId: farm.id, deletedAt: null },
+        });
+        if (!zone) {
+          zone = await this.prisma.zone.create({
+            data: { name: zoneName, farmId: farm.id },
+          });
+        }
+        zoneId = zone.id;
+        zonesCache.set(zoneName, zoneId);
+      }
+
+      // Create plant
+      const qrToken = nanoid(32);
+      const plant = await this.prisma.plant.create({
+        data: {
+          zoneId,
+          species,
+          plantedAt,
+          plantIndex,
+          qrToken,
+        },
+      });
+
+      // Generate QR
+      const publicUrl = process.env.PUBLIC_APP_URL ?? 'http://localhost:3000';
+      const payload = JSON.stringify({ plantId: plant.id, token: qrToken });
+      const svg = await QRCode.toString(`${publicUrl}/p/${plant.id}?t=${encodeURIComponent(qrToken)}`, { type: 'svg' });
+      await this.prisma.qrCode.create({
+        data: { plantId: plant.id, payload, imageKey: `qr/${plant.id}.svg` },
+      });
+
+      imported++;
+    }
+
+    return { success: true, count: imported };
   }
 }

@@ -9,8 +9,14 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Header,
+  Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -60,6 +66,33 @@ export class PlantsController {
   @ApiOperation({ summary: 'Create plant + QR' })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreatePlantDto) {
     return this.plants.create(user, dto);
+  }
+
+  // ─── Import / Export endpoints ───
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Export plants to CSV' })
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="plants.csv"')
+  async exportCsv(@CurrentUser() user: RequestUser, @Res() res: Response) {
+    const csv = await this.plants.exportCsv(user);
+    res.send(csv);
+  }
+
+  @Post('import')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
+  @ApiOperation({ summary: 'Import plants from CSV' })
+  importCsv(@CurrentUser() user: RequestUser, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.plants.importCsv(user, file.buffer);
   }
 
   @Get()

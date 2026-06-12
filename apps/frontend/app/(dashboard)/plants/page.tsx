@@ -20,6 +20,7 @@ import {
   Eye,
   Plus,
   X,
+  Upload,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -72,6 +73,52 @@ function PlantsPageContent() {
   const [page, setPage] = useState(1);
   const [editingPlant, setEditingPlant] = useState<PlantRow | null>(null);
   const [qrPlant, setQrPlant] = useState<PlantRow | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/plants/export`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "thanh_huyen_farm_plants.csv";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert("Lỗi khi xuất file Excel!");
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/plants/import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Import failed");
+      const data = await res.json();
+      alert(`Nhập dữ liệu thành công! Đã thêm ${data.count} cây.`);
+      qc.invalidateQueries({ queryKey: ["plants"] });
+      qc.invalidateQueries({ queryKey: ["zones"] });
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi khi nhập file Excel! Vui lòng kiểm tra lại cấu trúc file CSV.");
+    } finally {
+      setIsImporting(false);
+      e.target.value = ""; // reset input
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["plants"],
@@ -127,12 +174,25 @@ function PlantsPageContent() {
             Theo dõi {stats.total.toLocaleString()} cây sầu riêng trên toàn bộ trang trại
           </p>
         </div>
-        <Button className="rounded-2xl gap-2" asChild>
-          <Link href="/scan">
-            <Plus className="h-4 w-4" />
-            Thêm cây mới
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="rounded-2xl gap-2" onClick={handleExport}>
+            <Download className="h-4 w-4" /> Xuất Excel
+          </Button>
+          <div>
+            <input type="file" id="import-csv" className="hidden" accept=".csv" onChange={handleImport} disabled={isImporting} />
+            <Button variant="outline" className="rounded-2xl gap-2" disabled={isImporting} asChild>
+              <label htmlFor="import-csv" className="cursor-pointer">
+                <Upload className="h-4 w-4" /> {isImporting ? "Đang nhập..." : "Nhập Excel"}
+              </label>
+            </Button>
+          </div>
+          <Button className="rounded-2xl gap-2" asChild>
+            <Link href="/scan">
+              <Plus className="h-4 w-4" />
+              Thêm cây mới
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

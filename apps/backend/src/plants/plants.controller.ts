@@ -65,8 +65,8 @@ export class PlantsController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  findAll(@CurrentUser() user: RequestUser) {
-    return this.plants.findAll(user);
+  findAll(@CurrentUser() user: RequestUser, @Query('zoneId') zoneId?: string) {
+    return this.plants.findAll(user, zoneId);
   }
 
   @Get(':id')

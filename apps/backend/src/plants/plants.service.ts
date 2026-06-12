@@ -71,11 +71,12 @@ export class PlantsService {
     return { plant, qrSvg: svg };
   }
 
-  async findAll(user: RequestUser) {
+  async findAll(user: RequestUser, zoneId?: string) {
     return this.prisma.plant.findMany({
       where: {
         deletedAt: null,
         zone: { farm: { organizationId: user.organizationId } },
+        ...(zoneId ? { zoneId } : {}),
       },
       orderBy: { updatedAt: 'desc' },
       include: {

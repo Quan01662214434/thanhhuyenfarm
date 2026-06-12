@@ -11,7 +11,9 @@ import {
   Trash2,
   TreePine,
   X,
+  ListOrdered,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +32,7 @@ export default function ZonesPage() {
   const qc = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [managingZone, setManagingZone] = useState<Zone | null>(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
 
@@ -211,12 +214,17 @@ export default function ZonesPage() {
                       )}
                     </div>
 
-                    {/* Plant count */}
-                    <div className="flex items-center gap-2">
-                      <Sprout className="h-4 w-4 text-emerald-500" />
-                      <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                        <strong className="text-neutral-900 dark:text-white">{zone._count.plants.toLocaleString()}</strong> cây sầu riêng
-                      </span>
+                    {/* Plant count & Actions */}
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="flex items-center gap-2">
+                        <Sprout className="h-4 w-4 text-emerald-500" />
+                        <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                          <strong className="text-neutral-900 dark:text-white">{zone._count.plants.toLocaleString()}</strong> cây
+                        </span>
+                      </div>
+                      <Button variant="secondary" size="sm" className="rounded-xl h-8 text-xs gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400" onClick={() => setManagingZone(zone)}>
+                        <ListOrdered className="h-3 w-3" /> Cây trong khu
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -252,8 +260,130 @@ export default function ZonesPage() {
             isPending={createZone.isPending}
           />
         )}
+      <AnimatePresence>
+        {managingZone && (
+          <ManageZonePlantsModal
+            zone={managingZone}
+            onClose={() => setManagingZone(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function ManageZonePlantsModal({ zone, onClose }: { zone: Zone; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [plantIndex, setPlantIndex] = useState("");
+  const [species, setSpecies] = useState("Sầu riêng");
+
+  const { data: plants, isLoading } = useQuery({
+    queryKey: ["plants", "zone", zone.id],
+    queryFn: async () => {
+      const { data } = await api.get<any[]>(`/plants?zoneId=${zone.id}`);
+      // Sort by plantIndex numerically
+      return data.sort((a, b) => {
+        if (a.plantIndex === null && b.plantIndex === null) return 0;
+        if (a.plantIndex === null) return 1;
+        if (b.plantIndex === null) return -1;
+        return a.plantIndex - b.plantIndex;
+      });
+    },
+  });
+
+  const createPlant = useMutation({
+    mutationFn: async () => {
+      await api.post("/plants", {
+        zoneId: zone.id,
+        species,
+        plantedAt: new Date().toISOString(),
+        plantIndex: plantIndex ? parseInt(plantIndex, 10) : undefined,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plants", "zone", zone.id] });
+      qc.invalidateQueries({ queryKey: ["zones"] });
+      // Auto-increment
+      if (plantIndex) {
+        setPlantIndex((parseInt(plantIndex, 10) + 1).toString());
+      }
+    },
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+              <TreePine className="h-5 w-5 text-emerald-500" /> Cây thuộc {zone.name}
+            </h2>
+            <p className="text-xs text-neutral-500 mt-1">Quản lý và thêm số thứ tự cây cho khu vực này</p>
+          </div>
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Quick Add Form */}
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl mb-6 flex items-end gap-3 flex-wrap">
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 mb-1 block uppercase">Số thứ tự cây</label>
+            <Input type="number" value={plantIndex} onChange={(e) => setPlantIndex(e.target.value)} placeholder="VD: 1, 2, 3..." className="rounded-xl border-emerald-200 dark:border-emerald-800 bg-white dark:bg-neutral-900" />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 mb-1 block uppercase">Giống cây</label>
+            <Input value={species} onChange={(e) => setSpecies(e.target.value)} className="rounded-xl border-emerald-200 dark:border-emerald-800 bg-white dark:bg-neutral-900" />
+          </div>
+          <Button 
+            className="rounded-xl px-6 gap-2" 
+            disabled={!species || createPlant.isPending} 
+            onClick={() => createPlant.mutate()}
+          >
+            <Plus className="h-4 w-4" /> Thêm nhanh
+          </Button>
+        </div>
+
+        {/* Plant List */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-hide">
+          {isLoading ? (
+            <p className="text-center text-sm text-neutral-500 py-10">Đang tải...</p>
+          ) : plants?.length === 0 ? (
+            <p className="text-center text-sm text-neutral-500 py-10">Khu vực này chưa có cây nào.</p>
+          ) : (
+            plants?.map((p) => (
+              <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 hover:border-emerald-200 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center font-black text-emerald-700 dark:text-emerald-400 text-sm">
+                    {p.plantIndex != null ? p.plantIndex : "-"}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-neutral-900 dark:text-white">{p.species}</p>
+                    <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{p.health} · Ngày trồng: {new Date(p.plantedAt).toLocaleDateString("vi-VN")}</p>
+                  </div>
+                </div>
+                {/* Could add a delete/edit button here if needed in the future */}
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-neutral-400" asChild>
+                  <Link href={`/plants`}><Edit3 className="h-3 w-3" /></Link>
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

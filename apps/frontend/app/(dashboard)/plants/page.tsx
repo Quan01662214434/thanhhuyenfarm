@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { useState, useMemo, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,8 +57,17 @@ const healthConfig: Record<string, { label: string; color: string; bg: string; i
 const healthOptions = ["HEALTHY", "WATCH", "DISEASED", "RECOVERING", "DEAD"] as const;
 
 export default function PlantsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Đang tải...</div>}>
+      <PlantsPageContent />
+    </Suspense>
+  );
+}
+
+function PlantsPageContent() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("zone") || "");
   const [healthFilter, setHealthFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
   const [editingPlant, setEditingPlant] = useState<PlantRow | null>(null);

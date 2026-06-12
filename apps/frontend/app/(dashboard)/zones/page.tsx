@@ -35,6 +35,7 @@ export default function ZonesPage() {
   const [managingZone, setManagingZone] = useState<Zone | null>(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editVietgap, setEditVietgap] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["zones"],
@@ -63,8 +64,8 @@ export default function ZonesPage() {
   });
 
   const updateZone = useMutation({
-    mutationFn: async ({ id, name, description }: { id: string; name: string; description: string }) => {
-      await api.patch(`/zones/${id}`, { name, description });
+    mutationFn: async ({ id, name, description, vietgapCode }: { id: string; name: string; description: string; vietgapCode: string }) => {
+      await api.patch(`/zones/${id}`, { name, description, vietgapCode });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["zones"] });
@@ -79,16 +80,18 @@ export default function ZonesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["zones"] }),
   });
 
-  const startEdit = (zone: Zone) => {
+  const startEdit = (zone: Zone & { vietgapCode?: string }) => {
     setEditingId(zone.id);
     setEditName(zone.name);
     setEditDesc(zone.description || "");
+    setEditVietgap(zone.vietgapCode || "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName("");
     setEditDesc("");
+    setEditVietgap("");
   };
 
   return (
@@ -157,11 +160,20 @@ export default function ZonesPage() {
                         placeholder="VD: Thôn 5, Xã Đạ Sar, Lạc Dương, Lâm Đồng"
                       />
                     </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-500 mb-1 block">Mã chứng nhận VietGAP (Tùy chọn)</label>
+                      <Input
+                        value={editVietgap}
+                        onChange={(e) => setEditVietgap(e.target.value)}
+                        className="rounded-xl"
+                        placeholder="VD: VietGAP-12345"
+                      />
+                    </div>
                     <div className="flex gap-2 pt-1">
                       <Button
                         size="sm"
                         className="rounded-xl flex-1 gap-1"
-                        onClick={() => updateZone.mutate({ id: zone.id, name: editName, description: editDesc })}
+                        onClick={() => updateZone.mutate({ id: zone.id, name: editName, description: editDesc, vietgapCode: editVietgap })}
                         disabled={updateZone.isPending}
                       >
                         <Check className="h-3 w-3" />
@@ -211,6 +223,11 @@ export default function ZonesPage() {
                         <p className="text-sm text-neutral-700 dark:text-neutral-300">{zone.description}</p>
                       ) : (
                         <p className="text-sm text-neutral-400 italic">Chưa có địa chỉ — Bấm ✏️ để thêm</p>
+                      )}
+                      {(zone as any).vietgapCode && (
+                        <div className="mt-2 flex items-center gap-1.5 inline-flex rounded-lg bg-amber-100 dark:bg-amber-900/30 px-2.5 py-1 text-xs font-bold text-amber-800 dark:text-amber-400">
+                          <Check className="h-3 w-3" /> VietGAP: {(zone as any).vietgapCode}
+                        </div>
                       )}
                     </div>
 
@@ -439,6 +456,7 @@ function AddZoneModal({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [vietgapCode, setVietgapCode] = useState("");
   const [farmId, setFarmId] = useState("");
 
   return (
@@ -476,6 +494,11 @@ function AddZoneModal({
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Chi tiết vị trí..." className="rounded-xl" />
           </div>
 
+          <div>
+            <label className="text-xs font-medium text-neutral-500 mb-1 block">Mã chứng nhận VietGAP (Tùy chọn)</label>
+            <Input value={vietgapCode} onChange={(e) => setVietgapCode(e.target.value)} placeholder="VD: VietGAP-123..." className="rounded-xl" />
+          </div>
+
           {farms.length > 1 && (
             <div>
               <label className="text-xs font-medium text-neutral-500 mb-1 block">Trang trại *</label>
@@ -497,7 +520,7 @@ function AddZoneModal({
           <Button
             className="rounded-xl flex-1 gap-1"
             disabled={!name || (farms.length > 1 && !farmId) || isPending}
-            onClick={() => onSave({ name, description, farmId: farmId || undefined })}
+            onClick={() => onSave({ name, description, vietgapCode, farmId: farmId || undefined })}
           >
             <Check className="h-3 w-3" /> Lưu khu vực
           </Button>

@@ -1,0 +1,22 @@
+{
+  "name": "thanhhuyenfarm",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:fe": "npm run dev -w frontend",
+    "dev:be": "npm run start:dev -w backend",
+    "build": "npm run build -w @thanhhuyen/types && npm run build -w frontend && npm run build -w backend",
+    "lint": "npm run lint -w frontend && npm run lint -w backend",
+    "db:generate": "npm run prisma:generate -w backend",
+    "db:migrate": "npm run prisma:migrate -w backend",
+    "db:seed": "npm run prisma:seed -w backend",
+    "docker:up": "docker compose -f docker/docker-compose.yml --env-file docker/.env up --build -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

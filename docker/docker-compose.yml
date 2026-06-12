@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-farm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-farm}
+      POSTGRES_DB: ${POSTGRES_DB:-farm}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minio}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minio12345}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-farm}:${POSTGRES_PASSWORD:-farm}@postgres:5432/${POSTGRES_DB:-farm}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES: 15m
+      JWT_REFRESH_EXPIRES: 7d
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minio12345}
+      S3_BUCKET: ${S3_BUCKET:-farm-media}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: /api
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

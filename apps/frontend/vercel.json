@@ -1,0 +1,5 @@
+{
+  "installCommand": "cd ../.. && npm install && cd apps/frontend && npm install tailwindcss@3.4.17 autoprefixer@10.4.20 postcss@8.4.49",
+  "buildCommand": "cd ../.. && npm run build -w @thanhhuyen/types && cd apps/frontend && npm run build",
+  "framework": "nextjs"
+}

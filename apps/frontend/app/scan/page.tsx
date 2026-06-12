@@ -53,21 +53,31 @@ export default function ScanPage() {
           let targetToken = "";
 
           try {
-            const url = new URL(decodedText);
-            const pathMatch = url.pathname.match(/\/p\/(.+)/);
-            const token = url.searchParams.get("t");
-            if (pathMatch) {
-              targetPath = pathMatch[1];
-              targetToken = token || "demo-public-token-secure";
-            } else if (url.pathname.includes("/p/")) {
-               targetPath = url.pathname.split("/p/")[1];
-               targetToken = token || "demo-public-token-secure";
+            // First try to parse as JSON in case it's a legacy payload
+            const parsed = JSON.parse(decodedText);
+            if (parsed.plantId) {
+              targetPath = parsed.plantId;
+              targetToken = parsed.token || "demo-public-token-secure";
             }
-          } catch {
-            // Not a URL. If it looks like a cuid or simple string without spaces, treat it as ID
-            if (decodedText && !decodedText.includes(" ")) {
-              targetPath = decodedText;
-              targetToken = "demo-public-token-secure";
+          } catch (e) {
+            // Not JSON, try URL
+            try {
+              const url = new URL(decodedText);
+              const pathMatch = url.pathname.match(/\/p\/(.+)/);
+              const token = url.searchParams.get("t");
+              if (pathMatch) {
+                targetPath = pathMatch[1];
+                targetToken = token || "demo-public-token-secure";
+              } else if (url.pathname.includes("/p/")) {
+                 targetPath = url.pathname.split("/p/")[1];
+                 targetToken = token || "demo-public-token-secure";
+              }
+            } catch {
+              // Not a URL. If it looks like a cuid or simple string without spaces, treat it as ID
+              if (decodedText && !decodedText.includes(" ") && !decodedText.includes("{")) {
+                targetPath = decodedText;
+                targetToken = "demo-public-token-secure";
+              }
             }
           }
 
@@ -79,6 +89,7 @@ export default function ScanPage() {
             router.push(`/p/${targetPath}?t=${encodeURIComponent(targetToken)}`);
           } else {
             setLastScanned(decodedText);
+            alert("Mã QR không hợp lệ: " + decodedText);
           }
         },
         () => {

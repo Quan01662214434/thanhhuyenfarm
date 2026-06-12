@@ -202,3 +202,20 @@ body {
 .dark ::selection {
   background: rgba(52, 211, 153, 0.3);
 }
+
+/* ═══ Printing ═══ */
+@media print {
+  body > *:not(#print-root) {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+}

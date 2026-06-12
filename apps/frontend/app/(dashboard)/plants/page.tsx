@@ -21,6 +21,7 @@ import {
   Plus,
   X,
   Upload,
+  Printer,
 } from "lucide-react";
 import Barcode from "react-barcode";
 import Image from "next/image";
@@ -74,7 +75,8 @@ function PlantsPageContent() {
   const [healthFilter, setHealthFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
   const [editingPlant, setEditingPlant] = useState<PlantRow | null>(null);
-  const [qrPlant, setQrPlant] = useState<PlantRow | null>(null);
+  const [qrPlantId, setQrPlantId] = useState<string | null>(null);
+  const [printPlantId, setPrintPlantId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
   const handleExport = async () => {
@@ -294,7 +296,7 @@ function PlantsPageContent() {
                       <Button variant="secondary" size="sm" className="rounded-xl text-xs h-8 gap-1 flex-1" onClick={() => setEditingPlant(p)}>
                         <Edit3 className="h-3 w-3" /> Sửa
                       </Button>
-                      <Button variant="outline" size="sm" className="rounded-xl text-xs h-8 gap-1 flex-1" onClick={() => setQrPlant(p)}>
+                      <Button variant="outline" size="sm" className="rounded-xl text-xs h-8 gap-1 flex-1" onClick={() => setQrPlantId(p.id)}>
                         <QrCode className="h-3 w-3" /> QR
                       </Button>
                       <Button variant="ghost" size="sm" className="rounded-xl text-xs h-8 gap-1" asChild>
@@ -361,8 +363,18 @@ function PlantsPageContent() {
 
       {/* QR MODAL */}
       <AnimatePresence>
-        {qrPlant && (
-          <QrModal plant={qrPlant} onClose={() => setQrPlant(null)} />
+        {qrPlantId && (
+          <QrModal 
+            plant={data!.find((p) => p.id === qrPlantId)!} 
+            onClose={() => setQrPlantId(null)} 
+            onPrint={() => {
+              setQrPlantId(null);
+              setPrintPlantId(qrPlantId);
+            }} 
+          />
+        )}
+        {printPlantId && (
+          <PrintLabelModal plant={data!.find((p) => p.id === printPlantId)!} onClose={() => setPrintPlantId(null)} />
         )}
       </AnimatePresence>
     </div>
@@ -453,7 +465,7 @@ function EditPlantModal({ plant, onClose, onSave, isPending }: {
 }
 
 /* ===== QR Code Modal ===== */
-function QrModal({ plant, onClose }: { plant: PlantRow; onClose: () => void }) {
+function QrModal({ plant, onClose, onPrint }: { plant: PlantRow; onClose: () => void; onPrint: () => void }) {
   const publicUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3001";
   const qrUrl = `${publicUrl}/p/${plant.id}?t=${encodeURIComponent(plant.qrToken)}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrUrl)}&color=064e3b&bgcolor=ffffff&margin=10`;
@@ -506,17 +518,99 @@ function QrModal({ plant, onClose }: { plant: PlantRow; onClose: () => void }) {
           )}
 
           <div className="flex gap-2">
+            {plant.barcode && (
+              <Button variant="secondary" className="rounded-xl flex-1 gap-1 text-emerald-700 bg-emerald-100 hover:bg-emerald-200" onClick={onPrint}>
+                <Printer className="h-4 w-4" /> In Tem
+              </Button>
+            )}
             <Button className="rounded-xl flex-1 gap-1" onClick={downloadQR}>
-              <Download className="h-4 w-4" /> Tải xuống QR
+              <Download className="h-4 w-4" /> Tải QR
             </Button>
             <Button variant="outline" className="rounded-xl flex-1 gap-1" asChild>
               <Link href={qrUrl} target="_blank">
-                <Eye className="h-4 w-4" /> Xem trang
+                <Eye className="h-4 w-4" /> Xem
               </Link>
             </Button>
           </div>
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ===== Print Label Modal ===== */
+function PrintLabelModal({ plant, onClose }: { plant: PlantRow; onClose: () => void }) {
+  const [copies, setCopies] = useState(1);
+  const [labelSize, setLabelSize] = useState<"50x30" | "35x22">("50x30");
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <>
+      {/* UI Setting Modal */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden" onClick={onClose}>
+        <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+              <Printer className="h-5 w-5 text-emerald-500" /> Cài đặt In Tem Nhãn
+            </h2>
+            <Button variant="ghost" size="icon" className="rounded-xl" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-neutral-500 mb-1 block">Khổ giấy in (mm)</label>
+              <select className="w-full bg-neutral-50 dark:bg-neutral-800 border-none rounded-xl px-4 py-2.5 text-sm outline-none ring-1 ring-neutral-200 dark:ring-neutral-700 focus:ring-emerald-500" value={labelSize} onChange={(e) => setLabelSize(e.target.value as any)}>
+                <option value="50x30">50 x 30 mm (Chuẩn tem trái cây)</option>
+                <option value="35x22">35 x 22 mm (Tem nhỏ)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-neutral-500 mb-1 block">Số lượng tem cần in</label>
+              <Input type="number" min={1} max={100} value={copies} onChange={(e) => setCopies(parseInt(e.target.value) || 1)} className="rounded-xl" />
+            </div>
+
+            <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-xs">
+              <strong className="block mb-1">Hướng dẫn:</strong>
+              1. Kết nối máy in nhiệt Xprinter / TSC... <br/>
+              2. Bấm "In ngay" <br/>
+              3. Trong hộp thoại in của Chrome, phần <strong>Margin (Lề)</strong> chọn <strong>None</strong> <br/>
+              4. Phần <strong>Paper size</strong> chọn khổ giấy tương ứng.
+            </div>
+
+            <Button className="w-full rounded-xl gap-2" onClick={handlePrint}>
+              <Printer className="h-4 w-4" /> In {copies} tem ngay
+            </Button>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Hidden Print Container injected into DOM */}
+      <div id="print-root" className="hidden">
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @page {
+              size: ${labelSize === "50x30" ? "50mm 30mm" : "35mm 22mm"};
+              margin: 0;
+            }
+          `
+        }} />
+        <div className="flex flex-col gap-[2mm]">
+          {Array.from({ length: copies }).map((_, i) => (
+            <div key={i} className="bg-white flex flex-col items-center justify-center overflow-hidden" style={{ width: labelSize === "50x30" ? "50mm" : "35mm", height: labelSize === "50x30" ? "30mm" : "22mm", pageBreakAfter: "always" }}>
+              <div className="text-[10px] font-black uppercase text-black leading-tight text-center mt-1">THANH HUYỀN</div>
+              <div className="text-[8px] font-semibold text-black leading-tight mb-1 text-center truncate w-[95%]">Sầu riêng {plant.species.includes("sầu riêng") ? "" : "- "}{plant.species}</div>
+              <div className="scale-75 origin-top mb-1">
+                {plant.barcode && <Barcode value={plant.barcode} format="EAN13" width={1.8} height={35} fontSize={12} margin={0} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }

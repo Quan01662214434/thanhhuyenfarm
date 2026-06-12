@@ -260,7 +260,6 @@ export default function ZonesPage() {
             isPending={createZone.isPending}
           />
         )}
-      <AnimatePresence>
         {managingZone && (
           <ManageZonePlantsModal
             zone={managingZone}

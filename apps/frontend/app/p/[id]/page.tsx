@@ -22,7 +22,7 @@ function apiBase() {
 type PublicPlant = {
   id: string; species: string; health: string; plantedAt: string;
   statusNote: string | null; estimatedHarvestAt: string | null;
-  ageDays: number; qrToken: string;
+  ageDays: number; qrToken: string; barcode: string | null;
   zone: { name: string; address: string | null; vietgapCode: string | null; farm: { name: string; organization?: { qrConfig?: any } } };
   media: { url: string | null; caption: string | null }[];
   histories: { title: string; detail: string | null; createdAt: string }[];
@@ -146,6 +146,10 @@ export default function PublicPlantPage({ params }: { params: Promise<{ id: stri
   const showCaretakers = qrConfig.showCaretakers !== false;
   const variety = data.species.toLowerCase().includes("sầu riêng") ? "Monthong" : "Bản địa";
 
+  // If the URL id matches a 13-digit pattern OR matches the plant's barcode exactly,
+  // we treat this view as a "Product/Fruit" view instead of a "Tree" view.
+  const isBarcodeView = /^\d+$/.test(id) || (data.barcode && id === data.barcode);
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-200">
       <div className="mx-auto max-w-md bg-slate-50 min-h-screen shadow-2xl relative overflow-hidden">
@@ -155,14 +159,22 @@ export default function PublicPlantPage({ params }: { params: Promise<{ id: stri
           <div className="flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full">
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-inner flex items-center justify-center border border-emerald-300/50">
-                <ShieldCheck className="h-5 w-5 text-white" />
+                {isBarcodeView ? <Package className="h-5 w-5 text-white" /> : <ShieldCheck className="h-5 w-5 text-white" />}
               </div>
               <span className="text-sm font-black text-slate-800 tracking-tight uppercase">Thanh Huyền</span>
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${health.bg}`}>
-              <span className={`h-2.5 w-2.5 rounded-full ${health.dot} animate-pulse border border-white/50`} />
-              <span className={`text-xs font-bold uppercase tracking-wider ${health.color}`}>{health.label}</span>
-            </div>
+            {!isBarcodeView && (
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${health.bg}`}>
+                <span className={`h-2.5 w-2.5 rounded-full ${health.dot} animate-pulse border border-white/50`} />
+                <span className={`text-xs font-bold uppercase tracking-wider ${health.color}`}>{health.label}</span>
+              </div>
+            )}
+            {isBarcodeView && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border shadow-sm bg-emerald-50 border-emerald-200">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Chính hãng</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -180,28 +192,40 @@ export default function PublicPlantPage({ params }: { params: Promise<{ id: stri
             {/* ID Badge */}
             <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
               <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 shadow-lg flex items-center justify-center shrink-0 border border-slate-700">
-                <QrCode className="h-7 w-7 text-emerald-400" />
+                {isBarcodeView ? <Package className="h-7 w-7 text-emerald-400" /> : <QrCode className="h-7 w-7 text-emerald-400" />}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Hộ chiếu thực vật</p>
+                  <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">{isBarcodeView ? "Thông tin Sản phẩm" : "Hộ chiếu thực vật"}</p>
                 </div>
-                <p className="text-base font-mono font-bold text-slate-900 truncate tracking-tight">{data.id.slice(0, 16).toUpperCase()}</p>
+                <p className="text-base font-mono font-bold text-slate-900 truncate tracking-tight">{isBarcodeView ? (data.barcode || id) : data.id.slice(0, 16).toUpperCase()}</p>
               </div>
             </div>
 
             {/* Key Info Grid */}
             <div className="grid gap-y-4 gap-x-2">
-              <Row icon={<Sprout className="h-6 w-6 text-emerald-500" />} label="Tên thực vật" value={data.species} bold valueSize="text-lg" />
+              {isBarcodeView && (
+                <>
+                  <Row icon={<Package className="h-6 w-6 text-emerald-500" />} label="Sản phẩm" value={`Trái ${data.species}`} bold valueSize="text-lg text-emerald-700" />
+                  <Row icon={<Sprout className="h-6 w-6 text-teal-500" />} label="Cây mẹ (Nguồn gốc)" value={`Cây ${data.id.slice(0, 6).toUpperCase()}`} bold valueSize="text-base" />
+                </>
+              )}
+              {!isBarcodeView && (
+                <Row icon={<Sprout className="h-6 w-6 text-emerald-500" />} label="Tên thực vật" value={data.species} bold valueSize="text-lg" />
+              )}
               <Row icon={<Package className="h-6 w-6 text-violet-500" />} label="Chủng loại" value={variety} bold valueSize="text-base" />
-              <Row icon={<MapPin className="h-6 w-6 text-blue-500" />} label="Vị trí trồng" value={`${data.zone.name}${data.zone.address ? ` - ${data.zone.address}` : ""}`} bold valueSize="text-base" />
+              <Row icon={<MapPin className="h-6 w-6 text-blue-500" />} label={isBarcodeView ? "Nơi thu hoạch" : "Vị trí trồng"} value={`${data.zone.name}${data.zone.address ? ` - ${data.zone.address}` : ""}`} bold valueSize="text-base" />
               {data.zone.vietgapCode && (
                 <Row icon={<ShieldCheck className="h-6 w-6 text-amber-500" />} label="Chứng nhận VietGAP" value={data.zone.vietgapCode} bold valueSize="text-base text-amber-600" />
               )}
-              <Row icon={<CalendarDays className="h-6 w-6 text-amber-500" />} label="Ngày xuống giống"
-                value={new Date(data.plantedAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })} bold valueSize="text-base" />
-              <Row icon={<History className="h-6 w-6 text-teal-500" />} label="Độ tuổi" value={`${data.ageDays} ngày`} bold valueSize="text-base" />
+              {!isBarcodeView && (
+                <>
+                  <Row icon={<CalendarDays className="h-6 w-6 text-amber-500" />} label="Ngày xuống giống"
+                    value={new Date(data.plantedAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })} bold valueSize="text-base" />
+                  <Row icon={<History className="h-6 w-6 text-teal-500" />} label="Độ tuổi" value={`${data.ageDays} ngày`} bold valueSize="text-base" />
+                </>
+              )}
             </div>
           </motion.div>
         </div>

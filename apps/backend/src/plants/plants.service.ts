@@ -133,10 +133,16 @@ export class PlantsService {
       });
     }
 
-    // Also try: maybe the token IS the plant id (old QR format)
+    // Also try: maybe the token IS the plant id (old QR format), or it's a barcode
     if (!plant) {
       plant = await this.prisma.plant.findFirst({
-        where: { qrToken: id, deletedAt: null },
+        where: {
+          OR: [
+            { qrToken: id },
+            { barcode: id }
+          ],
+          deletedAt: null
+        },
         include: publicInclude,
       });
     }

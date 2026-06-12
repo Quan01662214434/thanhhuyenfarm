@@ -309,6 +309,26 @@ function ManageZonePlantsModal({ zone, onClose }: { zone: Zone; onClose: () => v
     },
   });
 
+  const updatePlantIndex = useMutation({
+    mutationFn: async ({ id, newIndex }: { id: string; newIndex: number | null }) => {
+      await api.patch(`/plants/${id}`, { plantIndex: newIndex });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plants", "zone", zone.id] });
+    },
+  });
+
+  const [editingIndexId, setEditingIndexId] = useState<string | null>(null);
+  const [editIndexValue, setEditIndexValue] = useState("");
+
+  const handleSaveIndex = (plantId: string) => {
+    updatePlantIndex.mutate({
+      id: plantId,
+      newIndex: editIndexValue ? parseInt(editIndexValue, 10) : null,
+    });
+    setEditingIndexId(null);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -365,9 +385,28 @@ function ManageZonePlantsModal({ zone, onClose }: { zone: Zone; onClose: () => v
             plants?.map((p) => (
               <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 hover:border-emerald-200 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center font-black text-emerald-700 dark:text-emerald-400 text-sm">
-                    {p.plantIndex != null ? p.plantIndex : "-"}
-                  </div>
+                  {editingIndexId === p.id ? (
+                    <Input
+                      type="number"
+                      autoFocus
+                      className="w-14 h-8 text-center px-1 py-0 rounded-md border-emerald-500 bg-white dark:bg-neutral-800"
+                      value={editIndexValue}
+                      onChange={(e) => setEditIndexValue(e.target.value)}
+                      onBlur={() => handleSaveIndex(p.id)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveIndex(p.id)}
+                    />
+                  ) : (
+                    <div 
+                      className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center font-black text-emerald-700 dark:text-emerald-400 text-sm cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors"
+                      onClick={() => {
+                        setEditingIndexId(p.id);
+                        setEditIndexValue(p.plantIndex?.toString() || "");
+                      }}
+                      title="Bấm để sửa số thứ tự"
+                    >
+                      {p.plantIndex != null ? p.plantIndex : "-"}
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm font-bold text-neutral-900 dark:text-white">{p.species}</p>
                     <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{p.health} · Ngày trồng: {new Date(p.plantedAt).toLocaleDateString("vi-VN")}</p>
